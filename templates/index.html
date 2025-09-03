@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Waveform - Audio Processor</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <style>
+    body {
+      background: #1a1a1a;
+      color: white;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    
+    .controls {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+    
+    .btn {
+      background: linear-gradient(45deg, #ff6b35, #f7931e);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(255, 107, 53, 0.4);
+    }
+    
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    .video-container {
+      background: #2a2a2a;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    
+    .video-player {
+      width: 100%;
+      max-width: 800px;
+      height: auto;
+      border-radius: 8px;
+      background: #000;
+    }
+    
+    .video-controls {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
+    .waveform-container {
+      background: #2a2a2a;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .waveform {
+      display: flex;
+      gap: 2px;
+      justify-content: center;
+      min-height: 120px;
+      align-items: flex-end;
+    }
+    
+    .bar {
+      width: 4px;
+      background: linear-gradient(to top, #ff6b35, #f7931e, #fff);
+      border-radius: 2px;
+      transition: all 0.3s ease;
+    }
+    
+    .bar:hover {
+      background: linear-gradient(to top, #fff, #ff6b35);
+      transform: scaleY(1.1);
+    }
+    
+    .fft-container {
+      background: #2a2a2a;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .fft-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 4px;
+      margin-top: 15px;
+    }
+    
+    .fft-bar {
+      background: linear-gradient(to top, #00ff00, #ffff00, #00ffff, #0000ff, #ff00ff);
+      border-radius: 3px;
+      transition: all 0.3s ease;
+      min-height: 20px;
+    }
+    
+    .fft-bar:hover {
+      transform: scaleY(1.2);
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    }
+    
+    .frequency-labels {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 4px;
+      margin-top: 10px;
+      font-size: 10px;
+      text-align: center;
+    }
+    
+    .freq-label {
+      color: #ccc;
+      font-size: 8px;
+    }
+    
+    .info {
+      background: #2a2a2a;
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    
+    .info h3 {
+      margin-top: 0;
+      color: #ff6b35;
+    }
+    
+    .loading {
+      text-align: center;
+      color: #ff6b35;
+      font-size: 18px;
+    }
+    
+    .error {
+      background: #ff4444;
+      color: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 10px 0;
+    }
+    
+    .segment-info {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      margin-top: 15px;
+    }
+    
+    .segment-item {
+      background: #333;
+      padding: 10px;
+      border-radius: 6px;
+      border-left: 4px solid #ff6b35;
+    }
+    
+    .status {
+      background: #333;
+      padding: 10px;
+      border-radius: 6px;
+      margin-top: 10px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    
+    .visualization-tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+    
+    .tab-btn {
+      background: #444;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    
+    .tab-btn.active {
+      background: #ff6b35;
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    .debug-info {
+      background: #333;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 15px;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    .animated-waveform {
+      display: flex;
+      gap: 2px;
+      justify-content: center;
+      min-height: 120px;
+      align-items: flex-end;
+      margin-top: 15px;
+    }
+    
+    .animated-bar {
+      width: 4px;
+      background: linear-gradient(to top, #00ff00, #ffff00, #ff6b35, #ff00ff);
+      border-radius: 2px;
+      transition: height 0.1s ease;
+      animation: pulse 0.5s ease-in-out infinite alternate;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+    
+    .audio-visualizer {
+      background: #000;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 15px;
+      position: relative;
+      overflow: hidden;
+    }
+    @keyframes waveMove {
+      0%, 100% { transform: translateX(-100%); }
+      50% { transform: translateX(100%); }
+    }
+    
+    .visualization-controls {
+      background: #2a2a2a;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .visualization-buttons {
+      display: flex;
+      gap: 10px;
+      margin: 20px 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    
+    .visualization-display {
+      background: #1a1a1a;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      text-align: center;
+      min-height: 200px;
+    }
+    
+    .visualization-display img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    }
+    
+    .visualization-info {
+      background: #333;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 15px;
+    }
+    
+    .visualization-details {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+    
+    .detail-item {
+      background: #444;
+      padding: 10px;
+      border-radius: 6px;
+      border-left: 3px solid #ff6b35;
+    }
+    
+    .detail-label {
+      font-size: 12px;
+      color: #ccc;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    
+    .detail-value {
+      font-size: 14px;
+      color: #fff;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🎵 Audio Waveform Processor</h1>
+      <p>Procesa archivos de audio y playlists M3U8 para visualizar ondas con análisis FFT</p>
+    </div>
+
+    <div class="controls">
+      <button class="btn" onclick="reproducirVideo()">🎬 Reproducir Video</button>
+      <button class="btn" onclick="cargarPlaylist()">📋 Cargar Playlist M3U8</button>
+      <button class="btn" onclick="procesarAudio()">🎵 Procesar Audio MP3</button>
+      <button class="btn" onclick="iniciarAnimacion()">🎨 Animación en Vivo</button>
+      <button class="btn" onclick="limpiarVisualizacion()">🗑️ Limpiar</button>
+      <button class="btn" onclick="toggleDebug()">🐛 Debug</button>
+    </div>
+
+    <div class="video-container" id="video-container" style="display: none;">
+      <h3>🎬 Reproductor de Video HLS</h3>
+      <video id="video" class="video-player" controls>
+        Tu navegador no soporta la reproducción de video HLS.
+      </video>
+      <div class="video-controls">
+        <button class="btn" onclick="togglePlay()">⏯️ Play/Pause</button>
+        <button class="btn" onclick="stopVideo()">⏹️ Stop</button>
+        <button class="btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+      </div>
+      <div class="status" id="video-status">Estado: Listo para reproducir</div>
+      
+      <!-- Visualizador de audio animado -->
+      <div class="audio-visualizer" id="audio-visualizer" style="display: none;">
+        <div class="animated-waveform" id="animated-waveform"></div>
+      </div>
+    </div>
+
+    <div class="waveform-container">
+      <h3>🎵 Visualización de Audio</h3>
+      
+      <div class="visualization-tabs">
+        <button class="tab-btn active" onclick="showTab('waveform')">📊 Onda Simple</button>
+        <button class="tab-btn" onclick="showTab('fft')">🎛️ Análisis FFT</button>
+        <button class="tab-btn" onclick="showTab('visualization')">📈 Visualización Profesional</button>
+      </div>
+      
+      <div class="tab-content active" id="waveform-tab">
+        <div class="waveform" id="waveform">
+          <div class="loading">Selecciona una opción para comenzar...</div>
+        </div>
+      </div>
+      
+      <div class="tab-content" id="fft-tab">
+        <div class="fft-container">
+          <h4>🎛️ Análisis de Frecuencias (12 Bandas)</h4>
+          <div class="fft-grid" id="fft-grid">
+            <div class="loading">Cargando análisis FFT...</div>
+          </div>
+          <div class="frequency-labels" id="freq-labels">
+            <!-- Las etiquetas de frecuencia se generarán dinámicamente -->
+          </div>
+        </div>
+      </div>
+      
+      <div class="tab-content" id="visualization-tab">
+        <div class="visualization-controls">
+          <h4>📈 Visualización Profesional: Waveform + Espectrograma</h4>
+          <p>Genera gráficos profesionales similares a software de análisis de audio</p>
+          
+          <div class="visualization-buttons">
+            <button class="btn" onclick="generarVisualizacionAudio()">🎵 Generar desde Audio MP3</button>
+            <button class="btn" onclick="generarVisualizacionPlaylist()">📋 Generar desde Playlist M3U8</button>
+            <button class="btn" onclick="generarVisualizacionInteractiva()">🖱️ Interactiva (Plotly)</button>
+            <button class="btn" onclick="generarVisualizacionInteractivaPlaylist()">📊 Interactiva Playlist</button>
+          </div>
+          
+          <div class="visualization-display" id="visualization-display">
+            <div class="loading">Haz clic en un botón para generar la visualización...</div>
+          </div>
+          
+          <div class="visualization-info" id="visualization-info" style="display: none;">
+            <h5>📊 Información de la Visualización</h5>
+            <div id="visualization-details"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="info" id="info" style="display: none;">
+      <h3>Información del Procesamiento</h3>
+      <div id="info-content"></div>
+    </div>
+
+    <div class="debug-info" id="debug-info" style="display: none;">
+      <h4>🐛 Información de Debug</h4>
+      <div id="debug-content"></div>
+    </div>
+  </div>
+
+  <script>
+    let hls = null;
+    let video = null;
+    let currentFftData = null;
+    let debugLog = [];
+    let animationInterval = null;
+    let isAnimating = false;
+
+    function logDebug(message) {
+      const timestamp = new Date().toLocaleTimeString();
+      debugLog.push(`[${timestamp}] ${message}`);
+      console.log(`[DEBUG] ${message}`);
+      
+      // Actualizar debug display si está visible
+      const debugContent = document.getElementById('debug-content');
+      if (debugContent) {
+        debugContent.innerHTML = debugLog.slice(-20).join('<br>'); // Mostrar últimos 20 logs
+      }
+    }
+
+    function toggleDebug() {
+      const debugInfo = document.getElementById('debug-info');
+      debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function showTab(tabName) {
+      // Ocultar todas las pestañas
+      document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      
+      // Mostrar la pestaña seleccionada
+      document.getElementById(tabName + '-tab').classList.add('active');
+      event.target.classList.add('active');
+      
+      // Si hay datos FFT, mostrarlos
+      if (tabName === 'fft' && currentFftData) {
+        displayFftData(currentFftData);
+      }
+    }
+
+    function displayFftData(fftData) {
+      const fftGrid = document.getElementById('fft-grid');
+      const freqLabels = document.getElementById('freq-labels');
+      
+      logDebug(`Displaying FFT data: ${JSON.stringify(fftData)}`);
+      
+      if (!fftData || fftData.length === 0) {
+        fftGrid.innerHTML = '<div class="loading">No hay datos FFT disponibles</div>';
+        return;
+      }
+      
+      // Mostrar el primer conjunto de bandas como ejemplo
+      const bands = fftData[0] || fftData;
+      
+      logDebug(`Bands to display: ${JSON.stringify(bands)}`);
+      
+      // Crear barras FFT
+      fftGrid.innerHTML = '';
+      bands.forEach((value, index) => {
+        const bar = document.createElement('div');
+        bar.className = 'fft-bar';
+        bar.style.height = Math.max(20, value) + 'px'; // Mínimo 20px de altura
+        bar.title = `Banda ${index + 1}: ${value}%`;
+        fftGrid.appendChild(bar);
+      });
+      
+      // Crear etiquetas de frecuencia
+      freqLabels.innerHTML = '';
+      const freqNames = ['20Hz', '40Hz', '80Hz', '160Hz', '320Hz', '640Hz', '1.3kHz', '2.6kHz', '5.2kHz', '10.4kHz', '20.8kHz', '41.6kHz'];
+      freqNames.forEach(name => {
+        const label = document.createElement('div');
+        label.className = 'freq-label';
+        label.textContent = name;
+        freqLabels.appendChild(label);
+      });
+    }
+
+    function iniciarAnimacion() {
+      const audioVisualizer = document.getElementById('audio-visualizer');
+      const animatedWaveform = document.getElementById('animated-waveform');
+      
+      audioVisualizer.style.display = 'block';
+      isAnimating = true;
+      
+      // Crear barras animadas
+      animatedWaveform.innerHTML = '';
+      for (let i = 0; i < 50; i++) {
+        const bar = document.createElement('div');
+        bar.className = 'animated-bar';
+        bar.style.height = '20px';
+        animatedWaveform.appendChild(bar);
+      }
+      
+      // Configurar Web Audio API para capturar audio del video
+      if (video && video.src) {
+        setupAudioAnalysis();
+      } else {
+        // Fallback a animación simulada si no hay video
+        startSimulatedAnimation();
+      }
+      
+      logDebug('Animación de audio iniciada');
+    }
+
+    function setupAudioAnalysis() {
+      try {
+        // Crear contexto de audio
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const analyser = audioContext.createAnalyser();
+        const source = audioContext.createMediaElementSource(video);
+        
+        // Configurar analizador
+        analyser.fftSize = 256;
+        analyser.smoothingTimeConstant = 0.8;
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        
+        // Conectar nodos
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+        
+        // Función de animación basada en audio real
+        function animateAudio() {
+          if (!isAnimating) return;
+          
+          analyser.getByteFrequencyData(dataArray);
+          const bars = document.querySelectorAll('.animated-bar');
+          
+          bars.forEach((bar, index) => {
+            // Mapear datos de frecuencia a barras
+            const freqIndex = Math.floor((index / bars.length) * bufferLength);
+            const audioLevel = dataArray[freqIndex] || 0;
+            
+            // Convertir nivel de audio (0-255) a altura (10-80px)
+            const height = 10 + (audioLevel / 255) * 70;
+            bar.style.height = height + 'px';
+            
+            // Cambiar color basado en la intensidad del audio
+            const intensity = audioLevel / 255;
+            const hue = 120 + (intensity * 240); // Verde a rojo
+            bar.style.background = `linear-gradient(to top, 
+              hsl(${hue}, 100%, 50%), 
+              hsl(${hue + 30}, 100%, 60%), 
+              hsl(${hue + 60}, 100%, 70%))`;
+          });
+          
+          requestAnimationFrame(animateAudio);
+        }
+        
+        animateAudio();
+        
+        logDebug('Análisis de audio real configurado');
+        
+      } catch (error) {
+        logDebug(`Error en análisis de audio: ${error.message}`);
+        // Fallback a animación simulada
+        startSimulatedAnimation();
+      }
+    }
+
+    function startSimulatedAnimation() {
+      // Iniciar animación simulada mejorada
+      if (animationInterval) {
+        clearInterval(animationInterval);
+      }
+      
+      animationInterval = setInterval(() => {
+        if (!isAnimating) return;
+        
+        const bars = document.querySelectorAll('.animated-bar');
+        const currentTime = video ? video.currentTime : Date.now() * 0.001;
+        
+        bars.forEach((bar, index) => {
+          // Patrón más realista basado en el tiempo del video
+          const timeOffset = currentTime + (index * 0.1);
+          const baseHeight = 20 + Math.sin(timeOffset * 2) * 25;
+          const bassBoost = Math.sin(timeOffset * 0.5) * 15; // Simular bajos
+          const trebleBoost = Math.sin(timeOffset * 4) * 10; // Simular agudos
+          const randomFactor = Math.random() * 15;
+          
+          const finalHeight = Math.max(10, baseHeight + bassBoost + trebleBoost + randomFactor);
+          
+          bar.style.height = finalHeight + 'px';
+          
+          // Colores más realistas basados en la frecuencia
+          const freqPosition = index / bars.length;
+          let hue;
+          if (freqPosition < 0.3) {
+            hue = 120 + (finalHeight / 60) * 60; // Verde a amarillo (bajos)
+          } else if (freqPosition < 0.7) {
+            hue = 60 + (finalHeight / 60) * 60; // Amarillo a naranja (medios)
+          } else {
+            hue = 30 + (finalHeight / 60) * 60; // Naranja a rojo (agudos)
+          }
+          
+          bar.style.background = `linear-gradient(to top, 
+            hsl(${hue}, 100%, 50%), 
+            hsl(${hue + 20}, 100%, 60%), 
+            hsl(${hue + 40}, 100%, 70%))`;
+        });
+      }, 50); // Actualizar más frecuentemente para mejor sincronización
+      
+      logDebug('Animación simulada mejorada iniciada');
+    }
+
+    function reproducirVideo() {
+      const videoContainer = document.getElementById("video-container");
+      const videoElement = document.getElementById("video");
+      const statusElement = document.getElementById("video-status");
+      
+      videoContainer.style.display = "block";
+      video = videoElement;
+      
+      // URL del playlist M3U8
+      const playlistUrl = "/video/playlist.m3u8";
+      
+      statusElement.textContent = "Estado: Cargando video...";
+      
+      if (Hls.isSupported()) {
+        hls = new Hls();
+        hls.loadSource(playlistUrl);
+        hls.attachMedia(video);
+        
+        hls.on(Hls.Events.MANIFEST_PARSED, function() {
+          statusElement.textContent = "Estado: Video cargado correctamente";
+          
+          // Configurar eventos del video para mejor sincronización
+          video.addEventListener('play', function() {
+            if (!isAnimating) {
+              setTimeout(() => {
+                iniciarAnimacion();
+              }, 500);
+            }
+          });
+          
+          video.addEventListener('pause', function() {
+            isAnimating = false;
+          });
+          
+          video.addEventListener('ended', function() {
+            isAnimating = false;
+          });
+          
+          video.play();
+        });
+        
+        hls.on(Hls.Events.ERROR, function(event, data) {
+          statusElement.textContent = `Estado: Error - ${data.type}`;
+          console.error("Error HLS:", data);
+        });
+        
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Soporte nativo para Safari
+        video.src = playlistUrl;
+        video.addEventListener('loadedmetadata', function() {
+          statusElement.textContent = "Estado: Video cargado correctamente";
+          
+          // Configurar eventos del video para mejor sincronización
+          video.addEventListener('play', function() {
+            if (!isAnimating) {
+              setTimeout(() => {
+                iniciarAnimacion();
+              }, 500);
+            }
+          });
+          
+          video.addEventListener('pause', function() {
+            isAnimating = false;
+          });
+          
+          video.addEventListener('ended', function() {
+            isAnimating = false;
+          });
+          
+          video.play();
+        });
+      } else {
+        statusElement.textContent = "Estado: HLS no soportado en este navegador";
+      }
+    }
+
+    function togglePlay() {
+      if (video) {
+        if (video.paused) {
+          video.play();
+          if (!isAnimating) {
+            setTimeout(() => {
+              iniciarAnimacion();
+            }, 100);
+          }
+        } else {
+          video.pause();
+          isAnimating = false;
+        }
+      }
+    }
+
+    function stopVideo() {
+      if (video) {
+        video.pause();
+        video.currentTime = 0;
+        isAnimating = false;
+      }
+    }
+
+    function toggleFullscreen() {
+      if (video) {
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          video.requestFullscreen();
+        }
+      }
+    }
+
+    async function cargarPlaylist() {
+      const waveform = document.getElementById("waveform");
+      const info = document.getElementById("info");
+      const infoContent = document.getElementById("info-content");
+      
+      // Mostrar loading
+      waveform.innerHTML = '<div class="loading">Procesando playlist M3U8 con análisis FFT...</div>';
+      info.style.display = "none";
+      
+      try {
+        logDebug('Iniciando carga de playlist...');
+        const response = await fetch("/api/process-playlist");
+        const data = await response.json();
+        
+        logDebug(`Respuesta del servidor recibida: ${JSON.stringify(data).substring(0, 200)}...`);
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        // Guardar datos FFT para mostrar en la pestaña correspondiente
+        currentFftData = data.fft_bands;
+        logDebug(`Datos FFT recibidos: ${JSON.stringify(currentFftData)}`);
+        
+        // Limpiar y crear barras
+        waveform.innerHTML = "";
+        
+        data.amplitudes.forEach((valor, i) => {
+          const bar = document.createElement("div");
+          bar.className = "bar";
+          bar.style.height = valor + "px";
+          bar.title = `Segmento ${i + 1}: ${data.segments[i] || 'N/A'} - Amplitud: ${valor}%`;
+          waveform.appendChild(bar);
+        });
+        
+        // Mostrar información
+        infoContent.innerHTML = `
+          <p><strong>Total de segmentos:</strong> ${data.playlist_info.total_segments}</p>
+          <p><strong>Duración por segmento:</strong> ${data.playlist_info.duration_per_segment} segundos</p>
+          <p><strong>Duración total:</strong> ${data.playlist_info.total_segments * data.playlist_info.duration_per_segment} segundos</p>
+          <p><strong>Bandas de frecuencia:</strong> ${data.playlist_info.frequency_bands}</p>
+          <p><strong>Análisis FFT:</strong> ✅ Procesado con transformada de Fourier</p>
+          <p><strong>Segmentos procesados exitosamente:</strong> ${data.playlist_info.successful_processing || 0}/${data.playlist_info.total_segments}</p>
+          
+          <div class="segment-info">
+            <h4>Segmentos detectados:</h4>
+            ${data.segments.map((segment, i) => `
+              <div class="segment-item">
+                <strong>Segmento ${i + 1}:</strong><br>
+                ${segment}<br>
+                <small>Amplitud promedio: ${data.amplitudes[i]}%</small>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        info.style.display = "block";
+        
+        // Mostrar datos FFT en la consola para debug
+        logDebug(`Datos FFT completos: ${JSON.stringify(data.fft_bands)}`);
+        
+      } catch (error) {
+        logDebug(`Error en cargarPlaylist: ${error.message}`);
+        waveform.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+      }
+    }
+
+    async function procesarAudio() {
+      const waveform = document.getElementById("waveform");
+      const info = document.getElementById("info");
+      const infoContent = document.getElementById("info-content");
+      
+      // Mostrar loading
+      waveform.innerHTML = '<div class="loading">Procesando archivo de audio...</div>';
+      info.style.display = "none";
+      
+      try {
+        const response = await fetch("/api/process-audio");
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        // Limpiar y crear barras
+        waveform.innerHTML = "";
+        
+        data.amplitudes.forEach((valor, i) => {
+          const bar = document.createElement("div");
+          bar.className = "bar";
+          bar.style.height = valor + "px";
+          bar.title = `Barra ${i + 1}: ${valor}px`;
+          waveform.appendChild(bar);
+        });
+        
+        // Mostrar información
+        infoContent.innerHTML = `
+          <p><strong>Frecuencia de muestreo:</strong> ${data.sample_rate} Hz</p>
+          <p><strong>Duración:</strong> ${data.duration.toFixed(2)} segundos</p>
+          <p><strong>Total de barras:</strong> ${data.amplitudes.length}</p>
+          <p><strong>Amplitud máxima:</strong> ${Math.max(...data.amplitudes)}px</p>
+        `;
+        info.style.display = "block";
+        
+      } catch (error) {
+        waveform.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+      }
+    }
+
+    function limpiarVisualizacion() {
+      const waveform = document.getElementById("waveform");
+      const info = document.getElementById("info");
+      const videoContainer = document.getElementById("video-container");
+      const fftGrid = document.getElementById("fft-grid");
+      const audioVisualizer = document.getElementById("audio-visualizer");
+      const visualizationDisplay = document.getElementById("visualization-display");
+      const visualizationInfo = document.getElementById("visualization-info");
+      
+      waveform.innerHTML = '<div class="loading">Selecciona una opción para comenzar...</div>';
+      info.style.display = "none";
+      videoContainer.style.display = "none";
+      fftGrid.innerHTML = '<div class="loading">Cargando análisis FFT...</div>';
+      audioVisualizer.style.display = "none";
+      visualizationDisplay.innerHTML = '<div class="loading">Haz clic en un botón para generar la visualización...</div>';
+      visualizationInfo.style.display = "none";
+      
+      // Detener animación
+      isAnimating = false;
+      if (animationInterval) {
+        clearInterval(animationInterval);
+        animationInterval = null;
+      }
+      
+      // Detener video si está reproduciéndose
+      if (video) {
+        video.pause();
+        video.currentTime = 0;
+      }
+      
+      if (hls) {
+        hls.destroy();
+        hls = null;
+      }
+      
+      currentFftData = null;
+      logDebug('Visualización limpiada');
+    }
+
+    async function generarVisualizacionAudio() {
+      const visualizationDisplay = document.getElementById("visualization-display");
+      const visualizationInfo = document.getElementById("visualization-info");
+      const visualizationDetails = document.getElementById("visualization-details");
+      
+      // Mostrar loading
+      visualizationDisplay.innerHTML = '<div class="loading">Generando visualización estática desde audio MP3...</div>';
+      visualizationInfo.style.display = "none";
+      
+      try {
+        logDebug('Iniciando generación de visualización estática desde audio MP3...');
+        const response = await fetch("/api/generate-audio-visualization");
+        const data = await response.json();
+        
+        logDebug(`Respuesta de visualización estática recibida: ${JSON.stringify(data)}`);
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        if (data.success) {
+          // Mostrar la imagen generada
+          visualizationDisplay.innerHTML = `
+            <img src="${data.image_url}" alt="Análisis de Audio: Waveform y Espectrograma" 
+                 onload="logDebug('Imagen de visualización estática cargada correctamente')" />
+          `;
+          
+          // Mostrar información de la visualización
+          visualizationDetails.innerHTML = `
+            <div class="detail-item">
+              <div class="detail-label">Duración</div>
+              <div class="detail-value">${data.audio_info.duration.toFixed(2)} segundos</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Frecuencia de Muestreo</div>
+              <div class="detail-value">${data.audio_info.sample_rate} Hz</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Amplitud Máxima</div>
+              <div class="detail-value">${data.audio_info.max_amplitude.toFixed(4)}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Rango de Frecuencia</div>
+              <div class="detail-value">${data.audio_info.spectrogram_info.frequency_range}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Rango de Tiempo</div>
+              <div class="detail-value">${data.audio_info.spectrogram_info.time_range}</div>
+            </div>
+          `;
+          
+          visualizationInfo.style.display = "block";
+          logDebug('Visualización estática de audio MP3 generada exitosamente');
+        } else {
+          throw new Error('Error en la generación de visualización estática');
+        }
+        
+      } catch (error) {
+        logDebug(`Error en generarVisualizacionAudio: ${error.message}`);
+        visualizationDisplay.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+      }
+    }
+
+    async function generarVisualizacionPlaylist() {
+      const visualizationDisplay = document.getElementById("visualization-display");
+      const visualizationInfo = document.getElementById("visualization-info");
+      const visualizationDetails = document.getElementById("visualization-details");
+      
+      // Mostrar loading
+      visualizationDisplay.innerHTML = '<div class="loading">Generando visualización estática desde playlist M3U8...</div>';
+      visualizationInfo.style.display = "none";
+      
+      try {
+        logDebug('Iniciando generación de visualización estática desde playlist M3U8...');
+        const response = await fetch("/api/generate-playlist-visualization");
+        const data = await response.json();
+        
+        logDebug(`Respuesta de visualización estática de playlist recibida: ${JSON.stringify(data)}`);
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        if (data.success) {
+          // Mostrar la imagen generada
+          visualizationDisplay.innerHTML = `
+            <img src="${data.image_url}" alt="Análisis de Playlist: Waveform y Espectrograma" 
+                 onload="logDebug('Imagen de visualización estática de playlist cargada correctamente')" />
+          `;
+          
+          // Mostrar información de la visualización
+          visualizationDetails.innerHTML = `
+            <div class="detail-item">
+              <div class="detail-label">Segmento Analizado</div>
+              <div class="detail-value">${data.segment_info.segment}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Duración del Segmento</div>
+              <div class="detail-value">${data.segment_info.duration.toFixed(2)} segundos</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Frecuencia de Muestreo</div>
+              <div class="detail-value">${data.segment_info.sample_rate} Hz</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Amplitud Máxima</div>
+              <div class="detail-value">${data.segment_info.max_amplitude.toFixed(4)}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Total de Segmentos</div>
+              <div class="detail-value">${data.playlist_info.total_segments}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Duración Total Estimada</div>
+              <div class="detail-value">${data.playlist_info.estimated_total_duration} segundos</div>
+            </div>
+          `;
+          
+          visualizationInfo.style.display = "block";
+          logDebug('Visualización estática de playlist M3U8 generada exitosamente');
+        } else {
+          throw new Error('Error en la generación de visualización estática de playlist');
+        }
+        
+      } catch (error) {
+        logDebug(`Error en generarVisualizacionPlaylist: ${error.message}`);
+        visualizationDisplay.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+      }
+    }
+
+    async function generarVisualizacionInteractiva() {
+      const visualizationDisplay = document.getElementById("visualization-display");
+      const visualizationInfo = document.getElementById("visualization-info");
+      const visualizationDetails = document.getElementById("visualization-details");
+      
+      // Mostrar loading
+      visualizationDisplay.innerHTML = '<div class="loading">Generando visualización interactiva desde audio MP3...</div>';
+      visualizationInfo.style.display = "none";
+      
+      try {
+        logDebug('Iniciando generación de visualización interactiva desde audio MP3...');
+        const response = await fetch("/api/generate-interactive-visualization");
+        const data = await response.json();
+        
+        logDebug(`Respuesta de visualización interactiva recibida: ${JSON.stringify(data)}`);
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        if (data.success) {
+          // Mostrar la visualización interactiva de Plotly
+          visualizationDisplay.innerHTML = data.html_content;
+          
+          // Mostrar información de la visualización
+          visualizationDetails.innerHTML = `
+            <div class="detail-item">
+              <div class="detail-label">Duración</div>
+              <div class="detail-value">${data.audio_info.duration.toFixed(2)} segundos</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Frecuencia de Muestreo</div>
+              <div class="detail-value">${data.audio_info.sample_rate} Hz</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Amplitud Máxima</div>
+              <div class="detail-value">${data.audio_info.max_amplitude.toFixed(4)}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Tipo de Visualización</div>
+              <div class="detail-value">Interactiva (Plotly)</div>
+            </div>
+          `;
+          
+          visualizationInfo.style.display = "block";
+          logDebug('Visualización interactiva de audio MP3 generada exitosamente');
+        } else {
+          throw new Error('Error en la generación de visualización interactiva');
+        }
+        
+      } catch (error) {
+        logDebug(`Error en generarVisualizacionInteractiva: ${error.message}`);
+        visualizationDisplay.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+      }
+    }
+
+    async function generarVisualizacionInteractivaPlaylist() {
+      const visualizationDisplay = document.getElementById("visualization-display");
+      const visualizationInfo = document.getElementById("visualization-info");
+      const visualizationDetails = document.getElementById("visualization-details");
+      
+      // Mostrar loading
+      visualizationDisplay.innerHTML = '<div class="loading">Generando visualización interactiva desde playlist M3U8...</div>';
+      visualizationInfo.style.display = "none";
+      
+      try {
+        logDebug('Iniciando generación de visualización interactiva desde playlist M3U8...');
+        const response = await fetch("/api/generate-interactive-playlist-visualization");
+        const data = await response.json();
+        
+        logDebug(`Respuesta de visualización interactiva de playlist recibida: ${JSON.stringify(data)}`);
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        if (data.success) {
+          // Mostrar la visualización interactiva de Plotly
+          visualizationDisplay.innerHTML = data.html_content;
+          
+          // Mostrar información de la visualización
+          visualizationDetails.innerHTML = `
+            <div class="detail-item">
+              <div class="detail-label">Segmento Analizado</div>
+              <div class="detail-value">${data.segment_info.segment}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Duración del Segmento</div>
+              <div class="detail-value">${data.segment_info.duration.toFixed(2)} segundos</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Frecuencia de Muestreo</div>
+              <div class="detail-value">${data.segment_info.sample_rate} Hz</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Amplitud Máxima</div>
+              <div class="detail-value">${data.segment_info.max_amplitude.toFixed(4)}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Total de Segmentos</div>
+              <div class="detail-value">${data.playlist_info.total_segments}</div>
+            </div>
+            <div class="detail-item">
+              <div class="detail-label">Tipo de Visualización</div>
+              <div class="detail-value">Interactiva (Plotly)</div>
+            </div>
+          `;
+          
+          visualizationInfo.style.display = "block";
+          logDebug('Visualización interactiva de playlist M3U8 generada exitosamente');
+        } else {
+          throw new Error('Error en la generación de visualización interactiva de playlist');
+        }
+        
+      } catch (error) {
+        logDebug(`Error en generarVisualizacionInteractivaPlaylist: ${error.message}`);
+        visualizationDisplay.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+      }
+    }
+
+    function generarVisualizacion() {
+      // Cambiar a la pestaña de visualización
+      showTab('visualization');
+    }
+
+    // Cargar datos al iniciar (opcional)
+    // cargarPlaylist();
+  </script>
+</body>
+</html>
